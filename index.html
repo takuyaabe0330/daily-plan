@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>デイリースケジュール評価AI</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 600px; margin: 20px auto; padding: 0 15px; color: #333; }
+    h1 { font-size: 1.4rem; text-align: center; }
+    label { font-weight: bold; display: block; margin-top: 15px; }
+    input, textarea, button { width: 100%; box-sizing: border-box; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 6px; font-size: 1rem; }
+    button { background: #007bff; color: white; border: none; font-weight: bold; margin-top: 15px; cursor: pointer; }
+    button:disabled { background: #aaa; }
+    .card { background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 15px; margin-top: 20px; }
+    .score-badge { display: inline-block; font-size: 1.5rem; font-weight: bold; color: #007bff; }
+    ul { padding-left: 20px; }
+    .hint { font-size: 0.8rem; color: #666; margin-top: 3px; }
+  </style>
+</head>
+<body>
+
+  <h1>⏱️ デイリースケジュール評価AI</h1>
+
+  <!-- APIキー入力（利用者のブラウザ内にのみ保存） -->
+  <label for="apiKey">Gemini API Key</label>
+  <input type="password" id="apiKey" placeholder="AIzaSy...">
+  <div class="hint">Google AI Studioで取得した無料キーを入力してください（端末内にのみ保存されます）。</div>
+
+  <!-- スケジュール入力 -->
+  <label for="schedule">本日のタイムスケジュール・予定</label>
+  <textarea id="schedule" rows="7" placeholder="09:00 - 12:00 資料作成&#10;13:00 - 15:00 論文精読&#10;20:00 - 23:00 資格試験の勉強"></textarea>
+
+  <button id="evalBtn" onclick="evaluateSchedule()">スケジュールを評価する</button>
+
+  <!-- 結果表示領域 -->
+  <div id="resultArea" style="display:none;" class="card">
+    <div>実現可能性スコア: <span id="score" class="score-badge"></span> / 5</div>
+    <p><strong>総評:</strong> <span id="summary"></span></p>
+    <h4>⚠️ 懸念点・ボトルネック</h4>
+    <ul id="bottlenecks"></ul>
+    <h4>💡 改善アドバイス</h4>
+    <ul id="advice"></ul>
+  </div>
+
+  <script>
+    // 保存済みのキーを復元
+    document.getElementById("apiKey").value = localStorage.getItem("user_gemini_key") || "";
+
+    async function evaluateSchedule() {
+      const apiKey = document.getElementById("apiKey").value.trim();
+      const schedule = document.getElementById("schedule").value.trim();
+      const btn = document.getElementById("evalBtn");
+
+      if (!apiKey) return alert("APIキーを入力してください。");
+      if (!schedule) return alert("スケジュールを入力してください。");
+
+      // 次回のためにローカルストレージへ保管
+      localStorage.setItem("user_gemini_key", apiKey);
+
+      btn.disabled = true;
+      btn.innerText = "Geminiが分析中...";
+
+      const prompt = `あなたは厳格なタイムマネジメント専門家です。以下の学習・仕事スケジュールを評価してください。
+必ず次のJSONフォーマットのみを出力してください。余計なマークダウンや挨拶は不要です。
+{
+  "score": 1〜5の整数,
+  "summary": "30字以内の総評",
+  "bottlenecks": ["懸念点1", "懸念点2"],
+  "advice": ["改善案1", "改善案2"]
+}
+
+【スケジュール】
+${schedule}`;
+
+      try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { responseMimeType: "application/json" }
+          })
+        });
+
+        const data = await res.json();
+        if (data.error) throw new Error(data.error.message);
+
+        const result = JSON.parse(data.candidates[0].content.parts[0].text);
+
+        // 画面に描画
+        document.getElementById("score").innerText = result.score;
+        document.getElementById("summary").innerText = result.summary;
+
+        document.getElementById("bottlenecks").innerHTML = result.bottlenecks.map(b => `<li>${b}</li>`).join("");
+        document.getElementById("advice").innerHTML = result.advice.map(a => `<li>${a}</li>`).join("");
+
+        document.getElementById("resultArea").style.display = "block";
+      } catch (err) {
+        alert("エラーが発生しました: " + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerText = "スケジュールを評価する";
+      }
+    }
+  </script>
+</body>
+</html>

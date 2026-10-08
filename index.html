@@ -3,74 +3,241 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>デイリースケジュール評価AI</title>
+  <title>デイリー実績・活動採点AI</title>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 600px; margin: 20px auto; padding: 0 15px; color: #333; }
-    h1 { font-size: 1.4rem; text-align: center; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 680px; margin: 20px auto; padding: 0 15px; color: #333; background: #fafafa; }
+    h1 { font-size: 1.4rem; text-align: center; margin-bottom: 20px; }
     label { font-weight: bold; display: block; margin-top: 15px; }
-    input, textarea, button { width: 100%; box-sizing: border-box; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 6px; font-size: 1rem; }
-    button { background: #007bff; color: white; border: none; font-weight: bold; margin-top: 15px; cursor: pointer; }
+    input, select, textarea, button { box-sizing: border-box; padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 0.95rem; }
+    button { background: #007bff; color: white; border: none; font-weight: bold; cursor: pointer; }
     button:disabled { background: #aaa; }
-    .card { background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 15px; margin-top: 20px; }
-    .score-badge { display: inline-block; font-size: 1.5rem; font-weight: bold; color: #007bff; }
-    ul { padding-left: 20px; }
+    .card { background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px; margin-top: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.03); }
     .hint { font-size: 0.8rem; color: #666; margin-top: 3px; }
+
+    /* 集計バッジ */
+    .stats-container { display: flex; gap: 12px; margin-top: 10px; }
+    .stat-box { flex: 1; background: #eef5ff; border: 1px solid #cce0ff; border-radius: 6px; padding: 10px; text-align: center; }
+    .stat-label { font-size: 0.75rem; color: #555; }
+    .stat-val { font-size: 1.3rem; font-weight: bold; color: #0056b3; }
+
+    /* カレンダー */
+    .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; }
+    .cal-day-label { font-size: 0.75rem; font-weight: bold; color: #777; padding: 4px 0; }
+    .cal-cell { min-height: 52px; background: #fff; border: 1px solid #eee; border-radius: 4px; padding: 2px; font-size: 0.8rem; cursor: pointer; display: flex; flex-direction: column; justify-content: space-between; align-items: center; }
+    .cal-cell:hover { background: #f0f7ff; }
+    .cal-cell.empty { background: transparent; border-color: transparent; cursor: default; }
+    .cal-cell.selected { border: 2px solid #007bff; background: #e8f2ff; }
+    .score-chip { font-size: 0.7rem; font-weight: bold; padding: 1px 4px; border-radius: 4px; color: #fff; margin-bottom: 2px; width: 85%; }
+    .score-high { background: #28a745; }
+    .score-mid { background: #007bff; }
+    .score-low { background: #fd7e14; }
+
+    /* 実績入力フォーム */
+    .entry-row { display: flex; gap: 6px; margin-top: 8px; align-items: center; }
+    .entry-row select { width: 95px; }
+    .entry-row input { flex: 1; }
+    .del-btn { background: #dc3545; color: white; width: 32px; height: 35px; padding: 0; }
+    .add-btn { background: #6c757d; font-size: 0.85rem; padding: 6px 12px; margin-top: 8px; }
+
+    /* 採点結果 */
+    .score-badge { font-size: 2.2rem; font-weight: bold; color: #007bff; }
+    ul { padding-left: 20px; margin: 6px 0; }
+    li { margin-bottom: 4px; }
   </style>
 </head>
 <body>
 
-  <h1>⏱️ デイリースケジュール評価AI</h1>
+  <h1>⏱️ デイリー実績・活動採点AI</h1>
 
-  <!-- APIキー入力（利用者のブラウザ内にのみ保存） -->
+  <!-- APIキー入力 -->
   <label for="apiKey">Gemini API Key</label>
-  <input type="password" id="apiKey" placeholder="AIzaSy...">
-  <div class="hint">Google AI Studioで取得した無料キーを入力してください（端末内にのみ保存されます）。</div>
+  <input type="password" id="apiKey" style="width: 100%;" placeholder="AIzaSy...">
+  <div class="hint">Google AI StudioのAPIキーを入力してください（ブラウザ内にのみ保存されます）。</div>
 
-  <!-- スケジュール入力 -->
-  <label for="schedule">本日のタイムスケジュール・予定</label>
-  <textarea id="schedule" rows="7" placeholder="09:00 - 12:00 資料作成&#10;13:00 - 15:00 論文精読&#10;20:00 - 23:00 資格試験の勉強"></textarea>
+  <!-- 集計 & カレンダー -->
+  <div class="card">
+    <h3 style="margin: 0 0 10px 0;">📅 実績カレンダー & 獲得スコア</h3>
+    
+    <div class="stats-container">
+      <div class="stat-box">
+        <div class="stat-label"><span id="currentMonthLabel">今月</span>の合計点</div>
+        <div class="stat-val" id="monthTotalScore">0 点</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label"><span id="currentYearLabel">今年</span>の合計点</div>
+        <div class="stat-val" id="yearTotalScore">0 点</div>
+      </div>
+    </div>
 
-  <button id="evalBtn" onclick="evaluateSchedule()">スケジュールを評価する</button>
+    <div class="calendar-header" style="margin-top: 15px;">
+      <button onclick="changeMonth(-1)" style="padding: 4px 10px;">◀ 前月</button>
+      <strong id="calendarTitle"></strong>
+      <button onclick="changeMonth(1)" style="padding: 4px 10px;">次月 ▶</button>
+    </div>
+    <div class="calendar-grid" id="calendarGrid"></div>
+  </div>
 
-  <!-- 結果表示領域 -->
+  <!-- 本日の実績入力カード -->
+  <div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <h3 style="margin: 0;">📝 <span id="selectedDateDisplay"></span> の活動実績</h3>
+      <input type="date" id="targetDate" onchange="onDateChange()" style="font-size: 0.85rem;">
+    </div>
+    <div class="hint">カレンダーの日付をクリックするか、上記で日付を選択できます。</div>
+
+    <label style="margin-top: 12px;">やったことリスト（時間・活動内容）</label>
+    <div id="entriesList"></div>
+    <button class="add-btn" onclick="addEntryRow()">+ 活動を追加</button>
+
+    <button id="evalBtn" onclick="evaluateActivities()" style="width: 100%; margin-top: 20px; padding: 12px; font-size: 1rem;">この日の実績を採点する</button>
+  </div>
+
+  <!-- 評価結果表示 -->
   <div id="resultArea" style="display:none;" class="card">
-    <div>実現可能性スコア: <span id="score" class="score-badge"></span> / 5</div>
-    <p><strong>総評:</strong> <span id="summary"></span></p>
-    <h4>⚠️ 懸念点・ボトルネック</h4>
-    <ul id="bottlenecks"></ul>
-    <h4>💡 改善アドバイス</h4>
+    <div style="text-align: center; border-bottom: 1px solid #eee; padding-bottom: 12px;">
+      <div style="font-size: 0.9rem; color: #666;">活動充実度スコア</div>
+      <div><span id="score" class="score-badge"></span> <span style="font-size: 1.1rem; color: #555;">/ 100 点</span></div>
+      <p style="margin: 6px 0 0 0; font-size: 1rem;"><strong>総評:</strong> <span id="summary"></span></p>
+    </div>
+    <h4 style="color: #28a745; margin: 12px 0 4px 0;">👍 評価できるポイント</h4>
+    <ul id="goodPoints"></ul>
+    <h4 style="color: #d39e00; margin: 12px 0 4px 0;">💡 さらなる改善アドバイス</h4>
     <ul id="advice"></ul>
   </div>
 
   <script>
-    // 保存済みのキーを復元
-    document.getElementById("apiKey").value = localStorage.getItem("user_gemini_key") || "";
+    const STORAGE_KEY_API = "user_gemini_key";
+    const STORAGE_KEY_LOGS = "daily_activity_eval_logs"; // { "YYYY-MM-DD": { entries: [...], result: {...} } }
 
-    async function evaluateSchedule() {
+    let currentYear, currentMonth;
+    let selectedDate = getTodayString();
+
+    window.onload = () => {
+      document.getElementById("apiKey").value = localStorage.getItem(STORAGE_KEY_API) || "";
+      
+      const today = new Date();
+      currentYear = today.getFullYear();
+      currentMonth = today.getMonth();
+
+      document.getElementById("targetDate").value = selectedDate;
+      loadDateData(selectedDate);
+      renderCalendar();
+      updateTotalStats();
+    };
+
+    function getTodayString() {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    // ---------------- タイムテーブル入力UI ----------------
+    function generateTimeOptions() {
+      let options = "";
+      for (let h = 0; h < 24; h++) {
+        for (let m = 0; m < 60; m += 30) {
+          const time = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+          options += `<option value="${time}">${time}</option>`;
+        }
+      }
+      options += `<option value="24:00">24:00</option>`;
+      return options;
+    }
+
+    const timeOptionsHTML = generateTimeOptions();
+
+    function addEntryRow(start = "09:00", end = "10:00", text = "") {
+      const container = document.getElementById("entriesList");
+      const row = document.createElement("div");
+      row.className = "entry-row";
+      row.innerHTML = `
+        <select class="entry-start">${timeOptionsHTML}</select>
+        <span>〜</span>
+        <select class="entry-end">${timeOptionsHTML}</select>
+        <input type="text" class="entry-text" placeholder="例: 論文精読、ミーティング、ジム" value="${text}">
+        <button class="del-btn" onclick="this.parentElement.remove()">✕</button>
+      `;
+      row.querySelector(".entry-start").value = start;
+      row.querySelector(".entry-end").value = end;
+      container.appendChild(row);
+    }
+
+    function getEntriesData() {
+      const rows = document.querySelectorAll(".entry-row");
+      const list = [];
+      rows.forEach(r => {
+        const start = r.querySelector(".entry-start").value;
+        const end = r.querySelector(".entry-end").value;
+        const text = r.querySelector(".entry-text").value.trim();
+        if (text) {
+          list.push({ start, end, text });
+        }
+      });
+      return list;
+    }
+
+    // ---------------- 日付切り替え ----------------
+    function onDateChange() {
+      selectedDate = document.getElementById("targetDate").value;
+      loadDateData(selectedDate);
+      renderCalendar();
+    }
+
+    function loadDateData(dateStr) {
+      document.getElementById("selectedDateDisplay").innerText = dateStr;
+      document.getElementById("targetDate").value = dateStr;
+      
+      const allLogs = JSON.parse(localStorage.getItem(STORAGE_KEY_LOGS) || "{}");
+      const dayData = allLogs[dateStr];
+      const container = document.getElementById("entriesList");
+      container.innerHTML = "";
+
+      if (dayData && dayData.entries && dayData.entries.length > 0) {
+        dayData.entries.forEach(e => addEntryRow(e.start, e.end, e.text));
+      } else {
+        // デフォルトで3行分用意
+        addEntryRow("09:00", "12:00", "");
+        addEntryRow("13:00", "15:00", "");
+        addEntryRow("15:30", "18:00", "");
+      }
+
+      if (dayData && dayData.result) {
+        renderResult(dayData.result);
+      } else {
+        document.getElementById("resultArea").style.display = "none";
+      }
+    }
+
+    // ---------------- 採点処理 ----------------
+    async function evaluateActivities() {
       const apiKey = document.getElementById("apiKey").value.trim();
-      const schedule = document.getElementById("schedule").value.trim();
+      const entries = getEntriesData();
       const btn = document.getElementById("evalBtn");
 
       if (!apiKey) return alert("APIキーを入力してください。");
-      if (!schedule) return alert("スケジュールを入力してください。");
+      if (entries.length === 0) return alert("やったこと（実績）を1件以上入力してください。");
 
-      // 次回のためにローカルストレージへ保管
-      localStorage.setItem("user_gemini_key", apiKey);
+      localStorage.setItem(STORAGE_KEY_API, apiKey);
 
       btn.disabled = true;
-      btn.innerText = "Geminiが分析中...";
+      btn.innerText = "実績を採点中...";
 
-      const prompt = `あなたは厳格なタイムマネジメント専門家です。以下の学習・仕事スケジュールを評価してください。
-必ず次のJSONフォーマットのみを出力してください。余計なマークダウンや挨拶は不要です。
+      const formattedSchedule = entries.map(e => `${e.start} - ${e.end}: ${e.text}`).join("\n");
+
+      const prompt = `あなたは厳格かつ建設的なパーソナル生産性コーチです。
+ユーザーが本日「実際に行った活動実績」を評価し、100点満点で採点してください。
+時間の使い方、集中と休憩のバランス、活動の密度を総合的に評価してください。
+
+必ず次のJSONフォーマットのみを出力してください。マークダウンの囲みや余計な挨拶は不要です。
 {
-  "score": 1〜5の整数,
-  "summary": "30字以内の総評",
-  "bottlenecks": ["懸念点1", "懸念点2"],
-  "advice": ["改善案1", "改善案2"]
+  "score": 0〜100の整数,
+  "summary": "35字以内の総評",
+  "goodPoints": ["良かった点1", "良かった点2"],
+  "advice": ["改善アドバイス1", "改善アドバイス2"]
 }
 
-【スケジュール】
-${schedule}`;
+【活動実績】
+${formattedSchedule}`;
 
       try {
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`, {
@@ -87,20 +254,122 @@ ${schedule}`;
 
         const result = JSON.parse(data.candidates[0].content.parts[0].text);
 
-        // 画面に描画
-        document.getElementById("score").innerText = result.score;
-        document.getElementById("summary").innerText = result.summary;
+        // 結果描画
+        renderResult(result);
 
-        document.getElementById("bottlenecks").innerHTML = result.bottlenecks.map(b => `<li>${b}</li>`).join("");
-        document.getElementById("advice").innerHTML = result.advice.map(a => `<li>${a}</li>`).join("");
+        // LocalStorageに保存
+        const allLogs = JSON.parse(localStorage.getItem(STORAGE_KEY_LOGS) || "{}");
+        allLogs[selectedDate] = {
+          entries: entries,
+          result: result
+        };
+        localStorage.setItem(STORAGE_KEY_LOGS, JSON.stringify(allLogs));
 
-        document.getElementById("resultArea").style.display = "block";
+        renderCalendar();
+        updateTotalStats();
+
       } catch (err) {
         alert("エラーが発生しました: " + err.message);
       } finally {
         btn.disabled = false;
-        btn.innerText = "スケジュールを評価する";
+        btn.innerText = "この日の実績を採点する";
       }
+    }
+
+    function renderResult(result) {
+      document.getElementById("score").innerText = result.score;
+      document.getElementById("summary").innerText = result.summary;
+      document.getElementById("goodPoints").innerHTML = (result.goodPoints || []).map(g => `<li>${g}</li>`).join("");
+      document.getElementById("advice").innerHTML = (result.advice || []).map(a => `<li>${a}</li>`).join("");
+      document.getElementById("resultArea").style.display = "block";
+    }
+
+    // ---------------- カレンダー & 集計 ----------------
+    function changeMonth(diff) {
+      currentMonth += diff;
+      if (currentMonth < 0) {
+        currentMonth = 11;
+        currentYear--;
+      } else if (currentMonth > 11) {
+        currentMonth = 0;
+        currentYear++;
+      }
+      renderCalendar();
+    }
+
+    function renderCalendar() {
+      const title = document.getElementById("calendarTitle");
+      title.innerText = `${currentYear}年 ${currentMonth + 1}月`;
+
+      const grid = document.getElementById("calendarGrid");
+      grid.innerHTML = "";
+
+      const days = ["日", "月", "火", "水", "木", "金", "土"];
+      days.forEach(d => {
+        grid.innerHTML += `<div class="cal-day-label">${d}</div>`;
+      });
+
+      const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+      const lastDate = new Date(currentYear, currentMonth + 1, 0).getDate();
+
+      const allLogs = JSON.parse(localStorage.getItem(STORAGE_KEY_LOGS) || "{}");
+
+      // 空白マス
+      for (let i = 0; i < firstDay; i++) {
+        grid.innerHTML += `<div class="cal-cell empty"></div>`;
+      }
+
+      // 日付マス
+      for (let d = 1; d <= lastDate; d++) {
+        const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        const log = allLogs[dateStr];
+        const isSelected = dateStr === selectedDate ? "selected" : "";
+
+        let badgeHTML = "";
+        if (log && log.result && typeof log.result.score === "number") {
+          const s = log.result.score;
+          let colorClass = s >= 80 ? "score-high" : (s >= 60 ? "score-mid" : "score-low");
+          badgeHTML = `<span class="score-chip ${colorClass}">${s}点</span>`;
+        }
+
+        const cell = document.createElement("div");
+        cell.className = `cal-cell ${isSelected}`;
+        cell.innerHTML = `<span>${d}</span>${badgeHTML}`;
+        cell.onclick = () => {
+          selectedDate = dateStr;
+          loadDateData(dateStr);
+          renderCalendar();
+        };
+        grid.appendChild(cell);
+      }
+    }
+
+    function updateTotalStats() {
+      const allLogs = JSON.parse(localStorage.getItem(STORAGE_KEY_LOGS) || "{}");
+      let monthTotal = 0;
+      let yearTotal = 0;
+
+      const now = new Date();
+      const thisYear = now.getFullYear();
+      const thisMonth = String(now.getMonth() + 1).padStart(2, '0');
+
+      document.getElementById("currentMonthLabel").innerText = `${now.getMonth() + 1}月`;
+      document.getElementById("currentYearLabel").innerText = `${thisYear}年`;
+
+      Object.keys(allLogs).forEach(dateStr => {
+        const [y, m] = dateStr.split("-");
+        const score = allLogs[dateStr].result?.score || 0;
+
+        if (parseInt(y) === thisYear) {
+          yearTotal += score;
+          if (m === thisMonth) {
+            monthTotal += score;
+          }
+        }
+      });
+
+      document.getElementById("monthTotalScore").innerText = `${monthTotal} 点`;
+      document.getElementById("yearTotalScore").innerText = `${yearTotal} 点`;
     }
   </script>
 </body>

@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>デイリー実績・活動採点AI</title>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 680px; margin: 20px auto; padding: 0 15px; color: #333; background: #fafafa; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 720px; margin: 20px auto; padding: 0 15px; color: #333; background: #fafafa; }
     h1 { font-size: 1.4rem; text-align: center; margin-bottom: 20px; }
     label { font-weight: bold; display: block; margin-top: 15px; }
-    input, select, textarea, button { box-sizing: border-box; padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 0.95rem; }
+    input, select, textarea, button { box-sizing: border-box; padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 0.9rem; }
     button { background: #007bff; color: white; border: none; font-weight: bold; cursor: pointer; }
     button:disabled { background: #aaa; }
     .card { background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px; margin-top: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.03); }
@@ -24,24 +24,25 @@
     .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
     .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; }
     .cal-day-label { font-size: 0.75rem; font-weight: bold; color: #777; padding: 4px 0; }
-    .cal-cell { min-height: 52px; background: #fff; border: 1px solid #eee; border-radius: 4px; padding: 2px; font-size: 0.8rem; cursor: pointer; display: flex; flex-direction: column; justify-content: space-between; align-items: center; }
+    .cal-cell { min-height: 56px; background: #fff; border: 1px solid #eee; border-radius: 4px; padding: 2px; font-size: 0.8rem; cursor: pointer; display: flex; flex-direction: column; justify-content: space-between; align-items: center; }
     .cal-cell:hover { background: #f0f7ff; }
     .cal-cell.empty { background: transparent; border-color: transparent; cursor: default; }
     .cal-cell.selected { border: 2px solid #007bff; background: #e8f2ff; }
-    .score-chip { font-size: 0.7rem; font-weight: bold; padding: 1px 4px; border-radius: 4px; color: #fff; margin-bottom: 2px; width: 85%; }
-    .score-high { background: #28a745; }
-    .score-mid { background: #007bff; }
-    .score-low { background: #fd7e14; }
+    .stamp-container { display: flex; flex-direction: column; align-items: center; line-height: 1.1; margin-bottom: 2px; }
+    .cal-stamp { font-size: 1.1rem; }
+    .cal-score-num { font-size: 0.65rem; font-weight: bold; color: #555; }
 
     /* 実績入力フォーム */
-    .entry-row { display: flex; gap: 6px; margin-top: 8px; align-items: center; }
-    .entry-row select { width: 95px; }
-    .entry-row input { flex: 1; }
-    .del-btn { background: #dc3545; color: white; width: 32px; height: 35px; padding: 0; }
+    .entry-row { display: flex; gap: 5px; margin-top: 8px; align-items: center; }
+    .entry-time { width: 85px; }
+    .entry-category { width: 115px; background: #fdfdfd; font-weight: 500; }
+    .entry-text { flex: 1; }
+    .del-btn { background: #dc3545; color: white; width: 30px; height: 35px; padding: 0; }
     .add-btn { background: #6c757d; font-size: 0.85rem; padding: 6px 12px; margin-top: 8px; }
 
     /* 採点結果 */
     .score-badge { font-size: 2.2rem; font-weight: bold; color: #007bff; }
+    .result-stamp { font-size: 2rem; margin-right: 5px; vertical-align: middle; }
     ul { padding-left: 20px; margin: 6px 0; }
     li { margin-bottom: 4px; }
   </style>
@@ -84,9 +85,9 @@
       <h3 style="margin: 0;">📝 <span id="selectedDateDisplay"></span> の活動実績</h3>
       <input type="date" id="targetDate" onchange="onDateChange()" style="font-size: 0.85rem;">
     </div>
-    <div class="hint">カレンダーの日付をクリックするか、上記で日付を選択できます。</div>
+    <div class="hint">カテゴリを選択し、右側の欄に詳細や進捗などを書き足してください。</div>
 
-    <label style="margin-top: 12px;">やったことリスト（時間・活動内容）</label>
+    <label style="margin-top: 12px;">やったことリスト</label>
     <div id="entriesList"></div>
     <button class="add-btn" onclick="addEntryRow()">+ 活動を追加</button>
 
@@ -97,7 +98,11 @@
   <div id="resultArea" style="display:none;" class="card">
     <div style="text-align: center; border-bottom: 1px solid #eee; padding-bottom: 12px;">
       <div style="font-size: 0.9rem; color: #666;">活動充実度スコア</div>
-      <div><span id="score" class="score-badge"></span> <span style="font-size: 1.1rem; color: #555;">/ 100 点</span></div>
+      <div>
+        <span id="resultStamp" class="result-stamp"></span>
+        <span id="score" class="score-badge"></span> 
+        <span style="font-size: 1.1rem; color: #555;">/ 100 点</span>
+      </div>
       <p style="margin: 6px 0 0 0; font-size: 1rem;"><strong>総評:</strong> <span id="summary"></span></p>
     </div>
     <h4 style="color: #28a745; margin: 12px 0 4px 0;">👍 評価できるポイント</h4>
@@ -109,6 +114,8 @@
   <script>
     const STORAGE_KEY_API = "user_gemini_key";
     const STORAGE_KEY_LOGS = "daily_activity_eval_logs";
+
+    const CATEGORIES = ["実験", "データ解析", "論文調査", "勉強", "ミーティング", "その他"];
 
     let currentYear, currentMonth;
     let selectedDate = getTodayString();
@@ -131,7 +138,7 @@
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     }
 
-    // タイムテーブル入力UI
+    // タイムテーブル & カテゴリ生成
     function generateTimeOptions() {
       let options = "";
       for (let h = 0; h < 24; h++) {
@@ -144,21 +151,28 @@
       return options;
     }
 
-    const timeOptionsHTML = generateTimeOptions();
+    function generateCategoryOptions() {
+      return CATEGORIES.map(cat => `<option value="${cat}">${cat}</option>`).join("");
+    }
 
-    function addEntryRow(start = "09:00", end = "10:00", text = "") {
+    const timeOptionsHTML = generateTimeOptions();
+    const categoryOptionsHTML = generateCategoryOptions();
+
+    function addEntryRow(start = "09:00", end = "10:00", category = "実験", text = "") {
       const container = document.getElementById("entriesList");
       const row = document.createElement("div");
       row.className = "entry-row";
       row.innerHTML = `
-        <select class="entry-start">${timeOptionsHTML}</select>
+        <select class="entry-time entry-start">${timeOptionsHTML}</select>
         <span>〜</span>
-        <select class="entry-end">${timeOptionsHTML}</select>
-        <input type="text" class="entry-text" placeholder="例: 実験データ整理、文献調査、ミーティング" value="${text}">
+        <select class="entry-time entry-end">${timeOptionsHTML}</select>
+        <select class="entry-category">${categoryOptionsHTML}</select>
+        <input type="text" class="entry-text" placeholder="詳細（例: サンプル調製、プロット作成）" value="${text}">
         <button class="del-btn" onclick="this.parentElement.remove()">✕</button>
       `;
       row.querySelector(".entry-start").value = start;
       row.querySelector(".entry-end").value = end;
+      row.querySelector(".entry-category").value = category;
       container.appendChild(row);
     }
 
@@ -168,12 +182,19 @@
       rows.forEach(r => {
         const start = r.querySelector(".entry-start").value;
         const end = r.querySelector(".entry-end").value;
+        const category = r.querySelector(".entry-category").value;
         const text = r.querySelector(".entry-text").value.trim();
-        if (text) {
-          list.push({ start, end, text });
-        }
+        list.push({ start, end, category, text });
       });
       return list;
+    }
+
+    // 点数に応じたスタンプ判定
+    function getStampInfo(score) {
+      if (score >= 90) return { stamp: "💮", label: "大変よくできました" };
+      if (score >= 80) return { stamp: "⭐️", label: "よくできました" };
+      if (score >= 60) return { stamp: "👍", label: "合格点" };
+      return { stamp: "💤", label: "おつかれさま" };
     }
 
     // 日付切り替え
@@ -193,11 +214,11 @@
       container.innerHTML = "";
 
       if (dayData && dayData.entries && dayData.entries.length > 0) {
-        dayData.entries.forEach(e => addEntryRow(e.start, e.end, e.text));
+        dayData.entries.forEach(e => addEntryRow(e.start, e.end, e.category || "実験", e.text));
       } else {
-        addEntryRow("09:00", "12:00", "");
-        addEntryRow("13:00", "15:00", "");
-        addEntryRow("15:30", "18:00", "");
+        addEntryRow("09:00", "12:00", "実験", "");
+        addEntryRow("13:00", "15:00", "データ解析", "");
+        addEntryRow("15:30", "17:30", "論文調査", "");
       }
 
       if (dayData && dayData.result) {
@@ -207,7 +228,7 @@
       }
     }
 
-    // 採点処理（評価基準を指示）
+    // 採点処理
     async function evaluateActivities() {
       const apiKey = document.getElementById("apiKey").value.trim();
       const entries = getEntriesData();
@@ -221,25 +242,28 @@
       btn.disabled = true;
       btn.innerText = "実績を採点中...";
 
-      const formattedSchedule = entries.map(e => `${e.start} - ${e.end}: ${e.text}`).join("\n");
+      const formattedSchedule = entries.map(e => {
+        const detail = e.text ? ` (${e.text})` : "";
+        return `${e.start} - ${e.end}: [${e.category}]${detail}`;
+      }).join("\n");
 
       const prompt = `あなたは厳格かつ建設的な生産性評価コーチです。
 ユーザーが本日「実際に行った活動実績」を評価し、以下の【明確な採点ルール】に従って100点満点で厳密に採点してください。
 
 【採点ルール】
 1. 基礎点（作業時間換算）:
-   - 仕事・研究・学習・知的作業・身体トレーニングなどの「実質的な活動時間」を合計してください（純粋な余暇・怠惰な時間は除く）。
+   - 実験、データ解析、論文調査、勉強、ミーティングなどの知的生産活動の実質時間を合計してください。
    - 活動時間1時間あたり約15点（30分あたり7.5点）として基礎点を算出してください。
    （目安：4時間＝60点、6時間＝90点、6.5〜7時間以上＝約100点）
 2. 質・配分の調整点（最大 ±15点）:
-   - 休憩の適切な配置（過度な連続作業がないか）、重要作業への集中時間帯、生活リズムのバランスを考慮して加減点してください。
+   - カテゴリの偏りやバランス、深い集中が必要な作業（解析・調査等）と手作業（実験等）の配分、適切な休憩配置を考慮して加減点してください。
 3. 最終スコア:
    - 基礎点 ＋ 調整点 で計算し、必ず「0〜100」の範囲の整数にしてください（100点を超える場合は100点）。
 
-必ず次のJSONフォーマットのみを出力してください。余計な挨拶やマークダウンコードフェンスは不要です。
+必ず次のJSONフォーマットのみを出力してください。余計な挨拶やマークダウンは不要です。
 {
   "score": 0〜100の整数,
-  "summary": "35字以内の総評（作業時間と評価の要点）",
+  "summary": "35字以内の総評",
   "goodPoints": ["良かった点1", "良かった点2"],
   "advice": ["改善アドバイス1", "改善アドバイス2"]
 }
@@ -262,10 +286,8 @@ ${formattedSchedule}`;
 
         const result = JSON.parse(data.candidates[0].content.parts[0].text);
 
-        // 結果描画
         renderResult(result);
 
-        // LocalStorageに保存
         const allLogs = JSON.parse(localStorage.getItem(STORAGE_KEY_LOGS) || "{}");
         allLogs[selectedDate] = {
           entries: entries,
@@ -285,6 +307,8 @@ ${formattedSchedule}`;
     }
 
     function renderResult(result) {
+      const stampInfo = getStampInfo(result.score);
+      document.getElementById("resultStamp").innerText = stampInfo.stamp;
       document.getElementById("score").innerText = result.score;
       document.getElementById("summary").innerText = result.summary;
       document.getElementById("goodPoints").innerHTML = (result.goodPoints || []).map(g => `<li>${g}</li>`).join("");
@@ -331,16 +355,20 @@ ${formattedSchedule}`;
         const log = allLogs[dateStr];
         const isSelected = dateStr === selectedDate ? "selected" : "";
 
-        let badgeHTML = "";
+        let stampHTML = "";
         if (log && log.result && typeof log.result.score === "number") {
-          const s = log.result.score;
-          let colorClass = s >= 80 ? "score-high" : (s >= 60 ? "score-mid" : "score-low");
-          badgeHTML = `<span class="score-chip ${colorClass}">${s}点</span>`;
+          const stampInfo = getStampInfo(log.result.score);
+          stampHTML = `
+            <div class="stamp-container">
+              <span class="cal-stamp">${stampInfo.stamp}</span>
+              <span class="cal-score-num">${log.result.score}点</span>
+            </div>
+          `;
         }
 
         const cell = document.createElement("div");
         cell.className = `cal-cell ${isSelected}`;
-        cell.innerHTML = `<span>${d}</span>${badgeHTML}`;
+        cell.innerHTML = `<span>${d}</span>${stampHTML}`;
         cell.onclick = () => {
           selectedDate = dateStr;
           loadDateData(dateStr);

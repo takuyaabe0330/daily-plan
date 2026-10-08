@@ -78,7 +78,7 @@
     <div class="calendar-grid" id="calendarGrid"></div>
   </div>
 
-  <!-- 本日の実績入力カード -->
+  <!-- 実績入力カード -->
   <div class="card">
     <div style="display: flex; justify-content: space-between; align-items: center;">
       <h3 style="margin: 0;">📝 <span id="selectedDateDisplay"></span> の活動実績</h3>
@@ -108,7 +108,7 @@
 
   <script>
     const STORAGE_KEY_API = "user_gemini_key";
-    const STORAGE_KEY_LOGS = "daily_activity_eval_logs"; // { "YYYY-MM-DD": { entries: [...], result: {...} } }
+    const STORAGE_KEY_LOGS = "daily_activity_eval_logs";
 
     let currentYear, currentMonth;
     let selectedDate = getTodayString();
@@ -131,7 +131,7 @@
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     }
 
-    // ---------------- タイムテーブル入力UI ----------------
+    // タイムテーブル入力UI
     function generateTimeOptions() {
       let options = "";
       for (let h = 0; h < 24; h++) {
@@ -154,7 +154,7 @@
         <select class="entry-start">${timeOptionsHTML}</select>
         <span>〜</span>
         <select class="entry-end">${timeOptionsHTML}</select>
-        <input type="text" class="entry-text" placeholder="例: 論文精読、ミーティング、ジム" value="${text}">
+        <input type="text" class="entry-text" placeholder="例: 実験データ整理、文献調査、ミーティング" value="${text}">
         <button class="del-btn" onclick="this.parentElement.remove()">✕</button>
       `;
       row.querySelector(".entry-start").value = start;
@@ -176,7 +176,7 @@
       return list;
     }
 
-    // ---------------- 日付切り替え ----------------
+    // 日付切り替え
     function onDateChange() {
       selectedDate = document.getElementById("targetDate").value;
       loadDateData(selectedDate);
@@ -195,7 +195,6 @@
       if (dayData && dayData.entries && dayData.entries.length > 0) {
         dayData.entries.forEach(e => addEntryRow(e.start, e.end, e.text));
       } else {
-        // デフォルトで3行分用意
         addEntryRow("09:00", "12:00", "");
         addEntryRow("13:00", "15:00", "");
         addEntryRow("15:30", "18:00", "");
@@ -208,7 +207,7 @@
       }
     }
 
-    // ---------------- 採点処理 ----------------
+    // 採点処理（評価基準を指示）
     async function evaluateActivities() {
       const apiKey = document.getElementById("apiKey").value.trim();
       const entries = getEntriesData();
@@ -224,14 +223,23 @@
 
       const formattedSchedule = entries.map(e => `${e.start} - ${e.end}: ${e.text}`).join("\n");
 
-      const prompt = `あなたは厳格かつ建設的なパーソナル生産性コーチです。
-ユーザーが本日「実際に行った活動実績」を評価し、100点満点で採点してください。
-時間の使い方、集中と休憩のバランス、活動の密度を総合的に評価してください。
+      const prompt = `あなたは厳格かつ建設的な生産性評価コーチです。
+ユーザーが本日「実際に行った活動実績」を評価し、以下の【明確な採点ルール】に従って100点満点で厳密に採点してください。
 
-必ず次のJSONフォーマットのみを出力してください。マークダウンの囲みや余計な挨拶は不要です。
+【採点ルール】
+1. 基礎点（作業時間換算）:
+   - 仕事・研究・学習・知的作業・身体トレーニングなどの「実質的な活動時間」を合計してください（純粋な余暇・怠惰な時間は除く）。
+   - 活動時間1時間あたり約15点（30分あたり7.5点）として基礎点を算出してください。
+   （目安：4時間＝60点、6時間＝90点、6.5〜7時間以上＝約100点）
+2. 質・配分の調整点（最大 ±15点）:
+   - 休憩の適切な配置（過度な連続作業がないか）、重要作業への集中時間帯、生活リズムのバランスを考慮して加減点してください。
+3. 最終スコア:
+   - 基礎点 ＋ 調整点 で計算し、必ず「0〜100」の範囲の整数にしてください（100点を超える場合は100点）。
+
+必ず次のJSONフォーマットのみを出力してください。余計な挨拶やマークダウンコードフェンスは不要です。
 {
   "score": 0〜100の整数,
-  "summary": "35字以内の総評",
+  "summary": "35字以内の総評（作業時間と評価の要点）",
   "goodPoints": ["良かった点1", "良かった点2"],
   "advice": ["改善アドバイス1", "改善アドバイス2"]
 }
@@ -284,7 +292,7 @@ ${formattedSchedule}`;
       document.getElementById("resultArea").style.display = "block";
     }
 
-    // ---------------- カレンダー & 集計 ----------------
+    // カレンダー & 集計
     function changeMonth(diff) {
       currentMonth += diff;
       if (currentMonth < 0) {
@@ -314,12 +322,10 @@ ${formattedSchedule}`;
 
       const allLogs = JSON.parse(localStorage.getItem(STORAGE_KEY_LOGS) || "{}");
 
-      // 空白マス
       for (let i = 0; i < firstDay; i++) {
         grid.innerHTML += `<div class="cal-cell empty"></div>`;
       }
 
-      // 日付マス
       for (let d = 1; d <= lastDate; d++) {
         const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
         const log = allLogs[dateStr];
